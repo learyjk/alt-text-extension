@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Webflow Alt Text",
+  "version": "0.1",
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ],
+  "icons": {
+    "16": "legit-favicon.png",
+    "48": "legit-favicon.png",
+    "128": "legit-favicon.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_icon": "legit-favicon.png",
+    "default_title": "Webflow Alt Text"
+  }
+}

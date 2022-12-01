@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "serve": "serve",
-    "build": "esbuild ./src/* --bundle --sourcemap --minify --outdir=dist --watch",
+    "build": "esbuild ./src/* --bundle --minify --outdir=dist --watch",
     "format": "prettier src/*.ts -w"
   },
   "repository": {
@@ -20,6 +20,7 @@
   },
   "homepage": "https://github.com/learyjk/dev-template#readme",
   "devDependencies": {
+    "@types/chrome": "^0.0.203",
     "esbuild": "^0.15.14",
     "prettier": "^2.7.1",
     "serve": "^14.1.1",
