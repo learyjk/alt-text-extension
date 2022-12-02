@@ -1,23 +1,24 @@
 {
   "manifest_version": 3,
-  "name": "Webflow Alt Text",
+  "name": "AI Alt Text for Webflow by Web Bae",
+  "description": "Add a button to Webflow asset details that uses AI to generate alt text for images.",
   "version": "0.1",
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": [
+        "https://webflow.com/design/*",
+        "https://alt-text-generator-api-kcffb7uzra-uc.a.run.app/describe"
+      ],
       "js": ["content.js"]
     }
   ],
   "icons": {
-    "16": "legit-favicon.png",
-    "48": "legit-favicon.png",
-    "128": "legit-favicon.png"
+    "16": "icon.png",
+    "32": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
   },
   "background": {
     "service_worker": "background.js"
-  },
-  "action": {
-    "default_icon": "legit-favicon.png",
-    "default_title": "Webflow Alt Text"
   }
 }
