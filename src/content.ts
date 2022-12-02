@@ -44,7 +44,7 @@ const altText = (overlayParent) => {
               '[data-automation-id="panel_asset_alt"]'
             );
             if (!altTextBox) {
-              console.error("no alt text box found");
+              console.info("no alt text box found");
               return;
             }
             const altTextButton = createAltTextButton(assetDetailsPopover);
@@ -59,17 +59,22 @@ const altText = (overlayParent) => {
               ?.parentNode?.append(altTextButton as HTMLDivElement);
 
             altTextButton?.addEventListener("click", (e) => {
+              const altTextArea = altTextBox.querySelector("textarea");
+              if (!altTextArea) {
+                return;
+              }
+              const imgSrc = assetDetailsPopover.querySelector("a")?.href;
+              if (!imgSrc) {
+                return;
+              }
+              const fileType = imgSrc.toLowerCase().split(".").pop();
+
               try {
-                const imgSrc = assetDetailsPopover.querySelector("a")?.href;
-                if (!imgSrc) {
-                  throw new Error("no image src found!");
+                if (fileType === "svg") {
+                  console.info("SVG not supported :(");
+                  altTextArea.value = "SVG not supported :(";
+                  return;
                 }
-
-                const altTextArea = altTextBox.querySelector("textarea");
-                if (!altTextArea) {
-                  throw new Error("no alt text area found!");
-                }
-
                 altTextArea.value = "Please wait";
                 const loadingInterval = setInterval(() => {
                   if (altTextArea.value.length >= 14) {
@@ -87,18 +92,30 @@ const altText = (overlayParent) => {
                   },
                   (response: { captions: CaptionData[] }) => {
                     clearInterval(loadingInterval);
+                    altTextArea.value = "";
                     if (response != undefined) {
-                      // get the caption data that we want
+                      console.log("response: ", response);
+
                       const captions = response.captions;
+                      if (captions[0].error) {
+                        altTextArea.value = captions[0].error.message;
+                        return;
+                      }
+                      // get the caption data that we want
                       const caption = captions[0].description.captions[0].text;
                       // set the alt text in the textarea
-                      altTextArea.value = caption;
+                      if (caption.length < 1) {
+                        console.info("No caption found :(");
+                        altTextArea.value = "No caption found :(";
+                      } else {
+                        altTextArea.value = caption;
+                      }
                     } else {
-                      altTextArea.value =
-                        "No response. Please wait 60 seconds and try again.";
-                      throw new Error(
+                      console.info(
                         "No response. Please wait 60 seconds and try again."
                       );
+                      altTextArea.value =
+                        "No response. Please wait 60 seconds and try again.";
                     }
                     // triggers change event so text saves on cancel
                     altTextArea.focus();
@@ -111,8 +128,7 @@ const altText = (overlayParent) => {
                 );
               } catch (error) {
                 console.error("error: ", error);
-              } finally {
-                buttonText.innerHTML = "AI Alt";
+                altTextArea.value = error.message;
               }
             });
           }
