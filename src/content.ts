@@ -1,4 +1,8 @@
+import { buttonHtmlString } from "./button";
 import { CaptionData } from "./types";
+
+let iFrame: HTMLIFrameElement | null;
+let lastImageClicked;
 
 // use setInterval to check if a div exists and cancel the interval when complete
 var interval = setInterval(function () {
@@ -6,8 +10,16 @@ var interval = setInterval(function () {
   const miniSettingsTarget = document.querySelector(".site-canvas")
     ?.firstElementChild?.firstElementChild?.childNodes[1] as HTMLDivElement;
   if (overlays.length >= 2 && miniSettingsTarget) {
+    iFrame = document.querySelector<HTMLIFrameElement>("#site-iframe-next");
+    // iFrame?.addEventListener("keydown", function (event) {
+    //   if (event.keyCode === 13) {
+    //     console.log(event.target);
+    //     console.log("enter pressed");
+    //   }
+    // });
+    addGlobalEventListener("click", "img", saveLastImageClicked);
     altTextMediaPane(overlays[1].parentNode);
-    altTextMiniSettings(miniSettingsTarget);
+    //altTextMiniSettings(miniSettingsTarget);
     clearInterval(interval);
   }
 }, 250);
@@ -25,7 +37,7 @@ const altTextMiniSettings = (miniSettingsTarget: HTMLDivElement) => {
             addedNode?.attributes?.getNamedItem("data-automation-id") &&
             addedNode?.classList.contains("image-mini-settings")
           ) {
-            console.log("image mini settings");
+            injectButtonToMiniSettings(addedNode);
           }
         }
       }
@@ -76,6 +88,71 @@ const altTextMediaPane = (overlayParent) => {
 
   // for when the UI doesn't work...
   // const assetButton = document.querySelector(".assets");
+};
+
+const injectButtonToMiniSettings = (addedNode: HTMLDivElement) => {
+  const button = createButton();
+  if (!button) return;
+  const altTextArea = addedNode.querySelector<HTMLInputElement>(
+    '[data-automation-id="image-settings-alt-input"]'
+  );
+  if (!altTextArea) return;
+
+  // add the button to mini settings
+  altTextArea?.parentNode?.append(button);
+
+  // add listener for button click
+  button.addEventListener("click", async () => {
+    try {
+      const response: CaptionData = await fetchAltText(lastImageClicked.src);
+      const caption = response.description.captions[0].text;
+      //insertCaptionToTextArea(caption, addedNode);
+
+      //toggleInputFocus(altTextArea);
+      //toggleFocusOnMiniSettingsInput(altTextArea);
+      // var evt = new Event("focus", {
+      //   bubbles: true,
+      //   cancelable: false,
+      // });
+      // altTextArea.dispatchEvent(evt);
+      console.log({ caption });
+      //altTextArea.value = caption;
+      altTextArea.value = "";
+      console.log(altTextArea.value);
+      //altTextArea.dispatchEvent(new KeyboardEvent("keydown", { keyCode: 13 }));
+      let i = 0;
+      let myInterval = setInterval(() => {
+        if (i === caption.length - 1) {
+          clearInterval(myInterval);
+        }
+        altTextArea.value += caption[i];
+        i++;
+      }, 100);
+      // setTimeout(() => {
+      //   addedNode
+      //     .querySelector<HTMLLabelElement>(".kit-checkbox.hi-dpi")
+      //     ?.click();
+      // }, 100);
+      // setTimeout(() => {
+      //   iFrame?.dispatchEvent(new KeyboardEvent("keydown", { keyCode: 13 }));
+      //   altTextArea.dispatchEvent(
+      //     new KeyboardEvent("keydown", { keyCode: 13 })
+      //   );
+      //   altTextArea.parentNode?.dispatchEvent(
+      //     new KeyboardEvent("keydown", { keyCode: 13 })
+      //   );
+      // }, 1);
+      // setTimeout(() => {
+      //   altTextArea.select();
+      //   altTextArea.focus();
+      // altTextArea.dispatchEvent(
+      //   new KeyboardEvent("keydown", { keyCode: 13 })
+      // );
+      // }, 1);
+    } catch (error) {
+      console.error(error);
+    }
+  });
 };
 
 const injectButtonToAssetDetailpopover = (addedNode: HTMLDivElement) => {
@@ -169,6 +246,66 @@ const injectButtonToAssetDetailpopover = (addedNode: HTMLDivElement) => {
   });
 };
 
+const fetchAltText = async (imageUrl: string) => {
+  return await chrome.runtime.sendMessage({
+    contentScriptQuery: "postData",
+    data: JSON.stringify({ imageUrl }),
+    url: `https://web-bae.azurewebsites.net/api/GetDescription?code=i0uGk4397zccFQC3NesER15fkumKOVL4uCB34VZ1OnI_AzFuJiyetQ==&clientId=default`,
+  });
+};
+
+const insertCaptionToTextArea = (caption: string, node: HTMLDivElement) => {
+  const altTextArea = node.querySelector<HTMLInputElement>(
+    '[data-automation-id="image-settings-alt-input"]'
+  );
+  if (!altTextArea) return;
+  console.log({ caption });
+  console.log({ altTextArea });
+  console.log(altTextArea.value);
+  altTextArea.value = "";
+  altTextArea.value = caption;
+  // triggers change event so text saves on cancel
+  altTextArea.focus();
+  var evt = new Event("change", {
+    bubbles: true,
+    cancelable: false,
+  });
+  altTextArea.dispatchEvent(evt);
+};
+
+const toggleFocusOnMiniSettingsInput = (node: HTMLInputElement) => {
+  node.parentElement?.classList.add("focused");
+  node.click();
+  var evt = new Event("change", {
+    bubbles: true,
+    cancelable: false,
+  });
+  node.parentElement?.dispatchEvent(evt);
+
+  setTimeout(() => {
+    node.parentElement?.click();
+    node.parentElement?.classList.remove("focused");
+  }, 1000);
+};
+
+const toggleInputFocus = (node: HTMLInputElement | HTMLTextAreaElement) => {
+  node.focus();
+  var evt = new Event("change", {
+    bubbles: true,
+    cancelable: false,
+  });
+  node.dispatchEvent(evt);
+};
+
+const createButton = (): HTMLDivElement | void => {
+  var newDiv = document.createElement("div");
+  newDiv.innerHTML = buttonHtmlString;
+  newDiv.style.position = "absolute";
+  newDiv.style.right = "2px";
+  newDiv.style.bottom = "2px";
+  return newDiv;
+};
+
 const createAltTextButton = (assetDetailsPopover: HTMLDivElement) => {
   const buttonClone = assetDetailsPopover
     ?.querySelector(".delete-asset")
@@ -204,3 +341,16 @@ const createAltTextButton = (assetDetailsPopover: HTMLDivElement) => {
 
   return buttonClone;
 };
+
+const saveLastImageClicked = (event) => {
+  lastImageClicked = event.target;
+};
+
+function addGlobalEventListener(type, selector, callback) {
+  iFrame!.contentDocument?.addEventListener(type, (e) => {
+    console.log("click");
+    if (e.target.matches(selector)) {
+      callback(e);
+    }
+  });
+}
