@@ -3,21 +3,48 @@ import { CaptionData } from "./types";
 // use setInterval to check if a div exists and cancel the interval when complete
 var interval = setInterval(function () {
   const overlays = document.querySelectorAll('[data-automation-id="overlay"]');
-  if (overlays.length >= 2) {
-    altText(overlays[1].parentNode);
+  const miniSettingsTarget = document.querySelector(".site-canvas")
+    ?.firstElementChild?.firstElementChild?.childNodes[1] as HTMLDivElement;
+  if (overlays.length >= 2 && miniSettingsTarget) {
+    altTextMediaPane(overlays[1].parentNode);
+    altTextMiniSettings(miniSettingsTarget);
     clearInterval(interval);
   }
 }, 250);
 
-const altText = (overlayParent) => {
-  // Options for the observer (which mutations to observe)
-  const config = {
-    attributes: true,
-    childList: true,
-    subtree: true,
-    attributeFilter: ["popover-asset"],
+const altTextMiniSettings = (miniSettingsTarget: HTMLDivElement) => {
+  const callback = (mutationList: MutationRecord[], observer) => {
+    for (const mutation of mutationList) {
+      // use mutation.target to get the element that has mutated.
+      // e.g. mutation.target.style.opacity = 0.5
+      console.log({ mutation });
+      if (mutation.type === "childList") {
+        if (mutation.addedNodes.length > 0) {
+          const addedNode = mutation.addedNodes[0] as HTMLDivElement;
+          if (
+            addedNode?.attributes?.getNamedItem("data-automation-id") &&
+            addedNode?.classList.contains("image-mini-settings")
+          ) {
+            console.log("image mini settings");
+          }
+        }
+      }
+    }
   };
 
+  // Create an observer instance linked to the callback function
+  const observer = new MutationObserver(callback);
+
+  // const target = miniSettingsTarget.firstChild?.firstChild?.childNodes[1];
+  // if (!target) {
+  //   console.info("no parent container for mini settings container found");
+  //   return;
+  // }
+  // Start observing the target node for configured mutations
+  observer.observe(miniSettingsTarget, { childList: true, subtree: true });
+};
+
+const altTextMediaPane = (overlayParent) => {
   // Callback function to execute when mutations are observed
   const callback = (mutationList: MutationRecord[], observer) => {
     for (const mutation of mutationList) {
@@ -34,103 +61,7 @@ const altText = (overlayParent) => {
               '[data-automation-id="asset-details-popover"]'
             )
           ) {
-            // get the popover
-            const assetDetailsPopover = addedNode.querySelector(
-              '[data-automation-id="asset-details-popover"]'
-            ) as HTMLDivElement;
-
-            // get the wrapper div for the alt text section
-            const altTextBox = assetDetailsPopover?.querySelector(
-              '[data-automation-id="panel_asset_alt"]'
-            );
-            if (!altTextBox) {
-              console.info("no alt text box found");
-              return;
-            }
-            const altTextButton = createAltTextButton(assetDetailsPopover);
-            if (!altTextButton) return;
-            const buttonText = altTextButton.querySelector("span");
-            if (!buttonText) {
-              return;
-            }
-
-            altTextBox
-              .querySelector("textarea")
-              ?.parentNode?.append(altTextButton as HTMLDivElement);
-
-            altTextButton?.addEventListener("click", (e) => {
-              const altTextArea = altTextBox.querySelector("textarea");
-              if (!altTextArea) {
-                return;
-              }
-              const imgSrc = assetDetailsPopover.querySelector("a")?.href;
-              if (!imgSrc) {
-                return;
-              }
-              const fileType = imgSrc.toLowerCase().split(".").pop();
-
-              try {
-                if (fileType === "svg") {
-                  console.info("SVG not supported :(");
-                  altTextArea.value = "SVG not supported :(";
-                  return;
-                }
-                altTextArea.value = "Please wait";
-                const loadingInterval = setInterval(() => {
-                  if (altTextArea.value.length >= 14) {
-                    altTextArea.value = "Please wait";
-                  } else {
-                    altTextArea.value += ".";
-                  }
-                }, 250);
-
-                chrome.runtime.sendMessage(
-                  {
-                    contentScriptQuery: "postData",
-                    data: JSON.stringify({ urls: [imgSrc] }),
-                    url: `https://alt-text-generator-api-kcffb7uzra-uc.a.run.app/describe`,
-                  },
-                  (response: { captions: CaptionData[] }) => {
-                    clearInterval(loadingInterval);
-                    altTextArea.value = "";
-                    if (response != undefined) {
-                      console.log("response: ", response);
-
-                      const captions = response.captions;
-                      if (captions[0].error) {
-                        altTextArea.value = captions[0].error.message;
-                        return;
-                      }
-                      // get the caption data that we want
-                      const caption = captions[0].description.captions[0].text;
-                      // set the alt text in the textarea
-                      if (caption.length < 1) {
-                        console.info("No caption found :(");
-                        altTextArea.value = "No caption found :(";
-                      } else {
-                        altTextArea.value = caption;
-                      }
-                    } else {
-                      console.info(
-                        "No response. Please wait 60 seconds and try again."
-                      );
-                      altTextArea.value =
-                        "No response. Please wait 60 seconds and try again.";
-                    }
-                    // triggers change event so text saves on cancel
-                    altTextArea.focus();
-                    var evt = new Event("change", {
-                      bubbles: true,
-                      cancelable: false,
-                    });
-                    altTextArea.dispatchEvent(evt);
-                  }
-                );
-              } catch (error) {
-                console.error("error: ", error);
-                altTextArea.value = error.message;
-              }
-            });
+            injectButtonToAssetDetailpopover(addedNode);
           }
         }
       }
@@ -141,10 +72,101 @@ const altText = (overlayParent) => {
   const observer = new MutationObserver(callback);
 
   // Start observing the target node for configured mutations
-  observer.observe(overlayParent, config);
+  observer.observe(overlayParent, { childList: true });
 
   // for when the UI doesn't work...
   // const assetButton = document.querySelector(".assets");
+};
+
+const injectButtonToAssetDetailpopover = (addedNode: HTMLDivElement) => {
+  const assetDetailsPopover = addedNode.querySelector(
+    '[data-automation-id="asset-details-popover"]'
+  ) as HTMLDivElement;
+
+  // get the wrapper div for the alt text section
+  const altTextBox = assetDetailsPopover?.querySelector(
+    '[data-automation-id="panel_asset_alt"]'
+  );
+  if (!altTextBox || !assetDetailsPopover) return;
+  const altTextButton = createAltTextButton(assetDetailsPopover);
+  if (!altTextButton) return;
+  const buttonText = altTextButton.querySelector("span");
+  if (!buttonText) {
+    return;
+  }
+  altTextBox
+    .querySelector("textarea")
+    ?.parentNode?.append(altTextButton as HTMLDivElement);
+
+  altTextButton?.addEventListener("click", (e) => {
+    const altTextArea = altTextBox.querySelector("textarea");
+    if (!altTextArea) {
+      return;
+    }
+    const imgSrc = assetDetailsPopover.querySelector("a")?.href;
+    if (!imgSrc) {
+      return;
+    }
+    const fileType = imgSrc.toLowerCase().split(".").pop();
+
+    try {
+      if (fileType === "svg") {
+        console.info("SVG not supported :(");
+        altTextArea.value = "SVG not supported :(";
+        return;
+      }
+      altTextArea.value = "Please wait";
+      const loadingInterval = setInterval(() => {
+        if (altTextArea.value.length >= 14) {
+          altTextArea.value = "Please wait";
+        } else {
+          altTextArea.value += ".";
+        }
+      }, 250);
+
+      chrome.runtime.sendMessage(
+        {
+          contentScriptQuery: "postData",
+          data: JSON.stringify({ imageUrl: imgSrc }),
+          url: `https://web-bae.azurewebsites.net/api/GetDescription?code=i0uGk4397zccFQC3NesER15fkumKOVL4uCB34VZ1OnI_AzFuJiyetQ==&clientId=default`,
+        },
+        (response: CaptionData) => {
+          clearInterval(loadingInterval);
+          altTextArea.value = "";
+          if (response) {
+            //console.log("response: ", response);
+            if (response.error) {
+              altTextArea.value = response.error.message;
+              return;
+            }
+
+            // get the caption data that we want
+            const caption = response.description.captions[0].text;
+            // set the alt text in the textarea
+            if (caption.length < 1) {
+              console.info("No caption found :(");
+              altTextArea.value = "No caption found :(";
+            } else {
+              altTextArea.value = caption;
+            }
+          } else {
+            altTextArea.value =
+              "No response. Please wait 60 seconds and try again.";
+          }
+          // triggers change event so text saves on cancel
+          altTextArea.focus();
+          var evt = new Event("change", {
+            bubbles: true,
+            cancelable: false,
+          });
+          altTextArea.dispatchEvent(evt);
+        }
+      );
+    } catch (error) {
+      console.error("error: ", error);
+      altTextArea.value = error.message;
+    }
+  });
 };
 
 const createAltTextButton = (assetDetailsPopover: HTMLDivElement) => {
@@ -161,17 +183,21 @@ const createAltTextButton = (assetDetailsPopover: HTMLDivElement) => {
     console.log("error getting text");
     return;
   }
-  textSpan.innerHTML = "AI Alt";
+  textSpan.innerHTML = "A.I. Bae";
   textSpan.style.marginLeft = "4px";
 
   let icon = buttonClone.querySelector("i");
   if (!icon) {
-    console.log("error gettig icon");
+    console.log("error getting icon");
     return;
   }
-  icon.style.backgroundPositionY = "-600px";
-  icon.style.backgroundPositionX = "0px";
+  // icon.style.backgroundPositionY = "-600px";
+  // icon.style.backgroundPositionX = "0px";
   //   buttonClone.style.marginLeft = "2px";
+  icon.remove();
+
+  buttonClone.style.background = "#F17144";
+
   buttonClone.style.position = "absolute";
   buttonClone.style.left = "0px";
   buttonClone.style.bottom = "0px";
