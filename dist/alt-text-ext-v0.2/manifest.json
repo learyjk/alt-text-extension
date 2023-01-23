@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "AI Alt Text for Webflow by Web Bae",
+  "description": "Add a button to Webflow asset details that uses AI to generate alt text for images.",
+  "version": "0.2",
+  "content_scripts": [
+    {
+      "matches": [
+        "https://webflow.com/design/*",
+        "https://web-bae.azurewebsites.net/api/GetDescription"
+      ],
+      "js": ["content.js"]
+    }
+  ],
+  "icons": {
+    "16": "icon.png",
+    "32": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}
